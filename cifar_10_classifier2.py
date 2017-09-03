@@ -1,3 +1,4 @@
+import time
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from keras.models import Sequential
 from keras.layers import Dense, Dropout
-from keras.optimizers import Adam
+from keras.callbacks import EarlyStopping
 
 from dataset.cifar10 import load_training_data, load_test_data
 
@@ -33,28 +34,39 @@ def preprocess_data(X_train, X_test):
 def build_model():
     model = Sequential()
     model.add(Dense(500, activation='relu', input_shape=(3072,)))
-    model.add(Dropout(0.5))
+    model.add(Dropout(0.33))
+    model.add(Dense(400, activation='relu'))
+    model.add(Dropout(0.33))
     model.add(Dense(300, activation='relu'))
-    model.add(Dropout(0.2))
+    model.add(Dropout(0.33))
     model.add(Dense(200, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(100, activation='relu'))
+    model.add(Dropout(0.5))
     model.add(Dense(10, activation='softmax'))
 
     print("Model Summary: " + "\n" + str(model.summary()))
     print("Model Config: " + "\n" + str(model.get_config()))
 #    print("Model Weights: " + "\n" + str(model.get_weights()))
 
-    decay = 0.00001
+#    decay = 0.00001
 
-    model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.0001, decay=decay), metrics=['accuracy'])
+    model.compile(loss='categorical_crossentropy', optimizer='adadelta', metrics=['accuracy'])
     return model
 
 model = build_model()
 
 X_train, X_test = preprocess_data(X_train, X_test)
 
-model.fit(X_train, Y_train, epochs=100, batch_size=128, verbose=2)
+early_stopping = EarlyStopping(monitor='val_loss', patience=2)
 
-y_pred = model.predict(X_test, batch_size=128)
-score = model.evaluate(X_test, Y_test, verbose=1)
+start = time.time()
+model.fit(X_train, Y_train, validation_data=(X_test[:5000], Y_test[:5000]), callbacks=[early_stopping], epochs=200,
+          batch_size=128, verbose=2)
+end = time.time()
+print("Model took %0.2f seconds to train"%(end - start))
+
+y_pred = model.predict(X_test[5000:10000], batch_size=128)
+score = model.evaluate(X_test[5000:10000], Y_test[5000:10000], verbose=1)
 
 print(score)
